@@ -9,8 +9,6 @@
 void* mallocc(size_t nbytes);
 char* prompt_terminal();
 char** parse_command(char* command);
-void open_process(char* process, char** args);
-void exec_command(char* command, char** args);
 
 
 #endif
