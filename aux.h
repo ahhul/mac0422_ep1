@@ -4,8 +4,7 @@
 #include <stdlib.h>
 
 #define MAX_COMMAND_SIZE 200
-#define MAX_ARGS 5
-#define MAX_ARG_SIZE 100
+#define MAX_ARGS 10
 
 void* mallocc(size_t nbytes);
 char* prompt_terminal();

@@ -7,16 +7,21 @@
 
 int main(int argc, char* argv[]) {
 	pid_t child_pid;
-	int i;
+	int i, j;
 	char* command = NULL;
-	char** parsed_command;
+	char* command_cpy = NULL;
+	char** parsed_command = NULL;
 
-	while(i < 5) {
+	while(1) {
 		/* ler comando */
 		command = prompt_terminal();
 
 		/* parsear comando em "programa" e "argumentos" */
 		parsed_command = parse_command(command);
+
+		for (i = 0; parsed_command[i] != NULL ; i++) {
+			printf("%s\n", parsed_command[i]);
+		}
 
 		/* melhor dar free nas coisas pra não estourar memória... */
 		free(command);
