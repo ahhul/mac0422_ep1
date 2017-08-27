@@ -3,9 +3,8 @@ CFLAGS = -g -Wall -ansi -pedantic -Wno-unused-result
 RM     = rm
 #------------------------------------------------
 
-# chama o linker
-ep1:  main.o aux.o
-	$(CC) main.o aux.o -o ep1
+ep1sh: main.o aux.o
+	$(CC) main.o aux.o -o ep1sh
 
 main.o: main.c aux.h
 	$(CC) $(CFLAGS) -c main.c 
