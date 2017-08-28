@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <grp.h>
 #include <sys/time.h>
 #include <sys/syscall.h>
 #include <sys/wait.h>
@@ -12,6 +13,7 @@
 
 int main(int argc, char* argv[]) {
 	struct timeval *crude_time =  mallocc(sizeof(struct timeval));
+	struct group *grp = mallocc(sizeof(struct group));
 	pid_t child_pid;
 	int err, status;
 	char *gname, *date_str, *command = NULL;
@@ -29,15 +31,23 @@ int main(int argc, char* argv[]) {
 			free(command);
 			free(parsed_command);
 			free(crude_time);
+			free(grp);
 			break;
 		}
 
 		/* comando "chown :<gid> <nome do arquivo>" */
 		else if (strcmp(parsed_command[0], "chown") == 0) {
-			/* tira o ":" do group ID */
+			/* tira o ":" do nome do grupo*/
 			gname = strtok(parsed_command[1], ":");
-			err = chown(parsed_command[3], -1, atoi(gname));
 
+			/* Procura por informações sobre o grupo de nome "gname".
+			   Usaremos o GID (group ID) contido na estrutura devolvida pela função */
+			grp = getgrnam(gname);
+			if (grp == NULL) {
+				printf("chown: nome de grupo não encontrado.\n");
+			}
+
+			err = chown(parsed_command[2], -1, grp->gr_gid);
 			if (err == -1) {
 				printf("chown: Operação cancelada.\n");
 			}
@@ -45,6 +55,7 @@ int main(int argc, char* argv[]) {
 			free(parsed_command);
 		}
 
+		/* comando "date" */
 		else if (strcmp(parsed_command[0], "date") == 0) {
 			date_str = mallocc(50 * sizeof(char));
 
@@ -75,5 +86,6 @@ int main(int argc, char* argv[]) {
 			free(parsed_command);
 		}
 	}
+
 	return 0;
 }
