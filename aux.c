@@ -19,19 +19,6 @@ void* mallocc(size_t nbytes) {
 	return ptr;
 }
 
-/* exibe o diretorio atual com um "$ " e le o comando
-   do usuario */
-char* prompt_terminal() {
-	char* input = mallocc(MAX_COMMAND_SIZE*sizeof(char));
-	char dir[200];
-
-	getcwd(dir, sizeof(dir));
-	printf("[%s]$ ", dir);
-	fgets(input, MAX_COMMAND_SIZE * sizeof(char), stdin);
-
-	return input;
-}
-
 /* Recebe uma string representando a entrada da linha de comando
    e retorna essa string parseada, ou seja, retorna um vetor de
    strings contendo o nome do programa e cada argumento separada-
