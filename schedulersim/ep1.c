@@ -6,7 +6,7 @@
 #include "process.h"
 #include "scheduler.h"
 
-Process **ptable = NULL;
+Process **process_table = NULL;
 pthread_mutex_t table_lock;
 
 int main(int argc, char* argv[]){
@@ -15,9 +15,9 @@ int main(int argc, char* argv[]){
 	ptable = malloc(100 * sizeof(Process *));
 
 	for (i = 0; i < 100; i++) {
-		ptable[i] = malloc(sizeof(Process));
-		ptable[i]->name = "processo";
-		ptable[i]->t0 = i;
+		process_table[i] = malloc(sizeof(Process));
+		process_table[i]->name = "processo";
+		process_table[i]->t0 = i;
 	}
 
 	for (i = 0; i < 100; i++) {
