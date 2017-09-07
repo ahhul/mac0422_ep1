@@ -2,7 +2,6 @@
 
 
 Process *new_process (double t0, double dt, double deadline, char *name) {
-
     Process *proc = mallocc (sizeof (Process));
     proc->t0 = t0;
     proc->dt = dt;
@@ -13,7 +12,6 @@ Process *new_process (double t0, double dt, double deadline, char *name) {
 }
 
 int count_processes (char *file_name) {
-
 	int lines, ch;
 	FILE trace = fopen(file_name, "r");
 	lines = ch = 0;
