@@ -7,12 +7,11 @@
    para falar em qual sua thread de execução, um campo next para lista ligada */
 struct process {
 	char* name;
-	double t0, dt, deadline, tf;
-	double deadline;
-	pthread_t thread;
+	double t0, dt, deadline, tf, priority;
+	pthread_mutex_t *cpu_lock;
+	pthread_t *exec_thread;
 	struct process *next;
 };
-
 typedef struct process Process;
 
 /* Cria um novo processo*/
@@ -23,6 +22,13 @@ int count_processes (char *trace);
 
 /* Retorna tr, o tempo de execução "do relógio" do processo */
 double real_time(Process *proc);
+
+
+/* mallocc - wrapper do malloc da stdlib, 
+com manejamento de erro. Inspirado no site de
+Paulo Feofiloff: https://www.ime.usp.br/~pf/algoritmos/aulas/aloca.html
+*/
+void* mallocc(size_t nbytes);
 
 
 
