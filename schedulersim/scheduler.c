@@ -6,7 +6,7 @@
 #include "process.h"
 #include "scheduler.h"
 
-Process *process_table;
+Process *process_table, *last_process = NULL;
 Process *head;
 int n_proc = 0, remaining_process = 0, schel_policy = ROUND_ROBIN;
 clock_t start_time;
@@ -14,16 +14,14 @@ pthread_mutex_t queue_lock, cpu0, cpu1, cpu2, cpu3, process_count;
 
 void scheduler_simulator(int scheduler_option, char *trace) {
 	int i;
-	char name[200]; 
+	char *name = malloc(20 * sizeof(char)); 
 	double t0, dt, deadline;
 	FILE *trace_in;
 	Process *tmp, *p;
 
-	printf("Inicializando lista de processos no scheduler_simulator...\n");
 	n_proc = remaining_process = count_processes (trace);
 	process_table = mallocc(sizeof (Process));
 	process_table->next = NULL;
-	printf("SCHEDULER_SIMULATOR: remaining_process = %d!\n", remaining_process);
 
 	trace_in = fopen(trace, "r");
 	/* Guarda as informações do arquivo de trace na lista head */
@@ -37,6 +35,8 @@ void scheduler_simulator(int scheduler_option, char *trace) {
 		tmp->next = p;
 		tmp = p;
 	}
+
+	fclose(trace_in);
 
 	printf("Inicializando escalonador...\n");
 	schel_policy = scheduler_option;
@@ -58,6 +58,7 @@ void scheduler_simulator(int scheduler_option, char *trace) {
 
 	free(process_table);
 	free(head);
+	free(name);
 }
 
 void shortest_job_first (int nproc){
@@ -87,16 +88,15 @@ void round_robin (int nproc) {
 	sleep(3);
 	printf("Distribuindo threads das CPUs.\n");
 	for (i = 0; i < N_CPUS; i++) {
-		printf("Lançando cpu_scheduler's...\n");
+		printf("Lançando cpu_scheduler numero %d...\n", i);
 		pthread_create(&(cpus[i]), NULL, cpu_scheduler, (void *) i);
 	}
 
 	/* a simulação acaba quando o queue_manager voltar */
-	pthread_join(q_manager, NULL);
-	pthread_join(cpus[0], NULL);
+	/*pthread_join(cpus[0], NULL);
 	pthread_join(cpus[1], NULL);
 	pthread_join(cpus[2], NULL);
-	pthread_join(cpus[3], NULL);
+	pthread_join(cpus[3], NULL);*/
 
 	return;
 }
@@ -133,18 +133,20 @@ void* queue_manager() {
 
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
-				while (sim_time >= dummy->next->t0 && dummy->next != NULL) {
+				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
 					printf("Processo novo na tabela!\n");
-					tmp = dummy->next->next;
-					dummy->next->next = NULL;
+					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
 					/* prioridade do processo é definido pelo tido de escalonador */
 					/* Round-robin: prioridade 3 para todos
 					   SJF: prioridade = dt*10
 					   Com prioridade: prioridade = (dt + t0) / deadline
 					*/
-					dummy->next->priority = 3.0;
-					printf("processo adicionado de nome %s.\n", dummy->next->name);
-					put_process(dummy->next);
+					tmp->priority = 3.0;
+					put_process(tmp);
+					printf("processo adicionado de t0 %.1f.\n", tmp->t0);
+
+					tmp = dummy->next->next;
+					free(dummy->next);
 					dummy->next = tmp;
 				}
 				pthread_mutex_unlock(&queue_lock);
@@ -155,22 +157,39 @@ void* queue_manager() {
 	}
 
 	else if (schel_policy == SHORTEST_JOB_FIRST){
-		while(remaining_process > 0) {
 
-			sim_time = (double) (clock() - start_time) / CLOCKS_PER_SEC;
-			if (sim_time >= head->t0) {
+		/* enquanto tiver novos processos para entrar na tabela */
+		while(head->next != NULL) {
+			printf("Q MANAGER: iniciando verificacao de processos pendentes.\n");
+
+			/* verifica se tem novos processos tentando entrar na fila
+				de processos */
+			sim_time = (double) (clock() - start_time) * 1000. / CLOCKS_PER_SEC;
+			printf("Tempo de simulação atual: %f.\n", sim_time);
+			dummy = head;
+			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
 				/*trava a fila para podermos mexer nela */
 				pthread_mutex_lock(&queue_lock);
 
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
-				while (sim_time >= head->t0) {
-					/* pegar processo e setar prioridade pra 3 (prioridade normal)
-					 pra todos eles (round robin)*/
-					break;
-				}
+				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
+					printf("Processo novo na tabela!\n");
+					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
+					/* prioridade do processo é definido pelo tido de escalonador */
+					/* Round-robin: prioridade 3 para todos
+					   SJF: prioridade = dt*10
+					   Com prioridade: prioridade = (dt + t0) / deadline
+					*/
+					tmp->priority = tmp->dt * 10.;
+					put_process(tmp);
+					printf("processo adicionado de t0 %.1f.\n", tmp->t0);
 
+					tmp = dummy->next->next;
+					free(dummy->next);
+					dummy->next = tmp;
+				}
 				pthread_mutex_unlock(&queue_lock);
 			}
 			/* dorme por 1 quantum */
@@ -179,28 +198,47 @@ void* queue_manager() {
 	}
 
 	else {
-		while(remaining_process > 0) {
 
-			sim_time = (double) (clock() - start_time) / CLOCKS_PER_SEC;
-			if (sim_time >= head->t0) {
+		/* enquanto tiver novos processos para entrar na tabela */
+		while(head->next != NULL) {
+			printf("Q MANAGER: iniciando verificacao de processos pendentes.\n");
+
+			/* verifica se tem novos processos tentando entrar na fila
+				de processos */
+			sim_time = (double) (clock() - start_time) * 1000. / CLOCKS_PER_SEC;
+			printf("Tempo de simulação atual: %f.\n", sim_time);
+			dummy = head;
+			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
 				/*trava a fila para podermos mexer nela */
 				pthread_mutex_lock(&queue_lock);
 
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
-				while (sim_time >= head->t0) {
-					/* pegar processo e setar prioridade pra 3 (prioridade normal)
-					 pra todos eles (round robin)*/
-					break;
-				}
+				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
+					printf("Processo novo na tabela!\n");
+					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
+					/* prioridade do processo é definido pelo tido de escalonador */
+					/* Round-robin: prioridade 3 para todos
+					   SJF: prioridade = dt*10
+					   Com prioridade: prioridade = (dt + t0) / deadline
+					*/
+					tmp->priority = (tmp->dt + tmp->t0) / tmp->deadline;
+					put_process(tmp);
+					printf("processo adicionado de t0 %.1f.\n", tmp->t0);
 
+					tmp = dummy->next->next;
+					free(dummy->next);
+					dummy->next = tmp;
+				}
 				pthread_mutex_unlock(&queue_lock);
 			}
 			/* dorme por 1 quantum */
 			nanosleep(&nsleep_time, NULL);
 		}
 	}
+
+	printf("Fim do queue_manager! :)\n");
 	return;
 }
 
@@ -240,6 +278,11 @@ void* cpu_scheduler(void* n_cpu) {
 		/* pega o processo e reorganizar a fila */
 		process = get_process(); 
 		pthread_mutex_unlock(&queue_lock);
+
+		if (process == NULL) {
+			pthread_mutex_lock(&process_count);
+			continue;
+		}
 
 		/* libera a trava da cpu para o processo poder executar */
 		pthread_mutex_unlock(cpu_lock);
@@ -289,10 +332,14 @@ void* processing(void* process) {
 Process *get_process() {
 	Process *result;
 
-	result = process_table->next;
-	process_table->next = result->next;
-
-	return result;
+	if (process_table->next != NULL) {
+		result = process_table->next;
+		process_table->next = result->next;
+		return result;
+	}
+	else {
+		return NULL;
+	}
 }
 
 void put_process(Process *p) {
