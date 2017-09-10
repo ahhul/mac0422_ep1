@@ -1,3 +1,7 @@
+/* João Henrique Luciano (NUSP: 8535957) */
+/* Ludmila Ferreira      (NUSP: 7557136) */
+/* EP 1 de Sistemas Operacionais - 2017  */
+
 #include "process.h"
 #include <stdio.h>
 #include <stdlib.h>

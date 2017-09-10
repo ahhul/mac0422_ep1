@@ -1,3 +1,7 @@
+/* João Henrique Luciano (NUSP: 8535957) */
+/* Ludmila Ferreira      (NUSP: 7557136) */
+/* EP 1 de Sistemas Operacionais - 2017  */
+
 #ifndef PROCESS_HEADER
 #define PROCESS_HEADER
 
