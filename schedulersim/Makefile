@@ -1,5 +1,5 @@
 CC     = gcc
-CFLAGS = -g -Wall -ansi -pedantic -Wno-unused-result
+CFLAGS = -g -Wall -ansi -Wno-unused-result
 RM     = rm
 #------------------------------------------------
 
