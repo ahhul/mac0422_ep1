@@ -1,6 +1,7 @@
 #include "process.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 
 Process *new_process (double t0, double dt, double deadline, char *name) {
@@ -9,6 +10,10 @@ Process *new_process (double t0, double dt, double deadline, char *name) {
     proc->dt = dt;
     proc->deadline = deadline;
     proc->name = name;
+    proc->priority = 0.;
+    proc->next = NULL;
+    proc->exec_thread = NULL;
+    proc->cpu_lock = NULL;
     return proc;
 }
 
@@ -22,11 +27,13 @@ int count_processes (char *file_name) {
 		if(ch == '\n')	lines++;
 	}
 
+	fclose(trace);
+
 	return lines;
 }
 
 double real_time (Process *proc){
-    return proc->tf - proc->t0;
+    return proc->tf - proc->start_time;
 }
 
 void* mallocc(size_t nbytes) {

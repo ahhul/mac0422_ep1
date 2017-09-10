@@ -1,8 +1,12 @@
 #include <pthread.h>
+#include <errno.h>
+#include <semaphore.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 #include "process.h"
 #include "scheduler.h"
 
@@ -10,7 +14,7 @@ Process *process_table, *last_process = NULL;
 Process *head;
 int n_proc = 0, schel_policy = ROUND_ROBIN;
 clock_t start_time;
-pthread_mutex_t queue_lock, cpu0, cpu1, cpu2, cpu3;
+sem_t queue_lock, cpu_locks[N_CPUS];
 
 void scheduler_simulator(int scheduler_option, char *trace) {
 	int i;
@@ -66,23 +70,19 @@ void shortest_job_first (int nproc){
 
 void round_robin (int nproc) {
 	pthread_t q_manager, cpus[N_CPUS];
-	pthread_mutex_t *cpu_lock;
-	int i, arg_i[N_CPUS];
+	int i, cpu_ids[N_CPUS];
 
 	/* prepara as coisas do queue_manager e lança ele */
 
-	pthread_mutex_init(&queue_lock, NULL);
+	sem_init(&queue_lock, 0, 1);
 	pthread_create(&q_manager, NULL, queue_manager, NULL);
 
-	pthread_mutex_init(&cpu0, NULL);
-	pthread_mutex_init(&cpu1, NULL);
-	pthread_mutex_init(&cpu2, NULL);
-	pthread_mutex_init(&cpu3, NULL);
 
 	sleep(3);
 	for (i = 0; i < N_CPUS; i++) {
-		arg_i[i] = i;
-		pthread_create(&(cpus[i]), NULL, cpu_scheduler, (void *) &arg_i[i]);
+		sem_init(&cpu_locks[i], 0, 1);
+		cpu_ids[i] = i;
+		pthread_create(&(cpus[i]), NULL, cpu_scheduler, (void *) &cpu_ids[i]);
 	}
 
 	/* a simulação acaba quando o escalonamento das CPUs acabar */
@@ -90,8 +90,6 @@ void round_robin (int nproc) {
 	pthread_join(cpus[1], NULL);
 	pthread_join(cpus[2], NULL);
 	pthread_join(cpus[3], NULL);
-
-	return;
 }
 
 void priority_scheduling (int nproc) {
@@ -119,26 +117,25 @@ void* queue_manager() {
 			dummy = head;
 			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
-				/*trava a fila para podermos mexer nela */
-				pthread_mutex_lock(&queue_lock);
-
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
 				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
 					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
 					/* prioridade do processo é definido pelo tido de escalonador */
-					/* Round-robin: prioridade 3 para todos
+					/* Round-robin: prioridade 1 para todos
 					   SJF: prioridade = dt*10
 					   Com prioridade: prioridade = (dt + t0) / deadline
 					*/
-					tmp->priority = 3.0;
+					tmp->priority = 2.0;
+
+					sem_wait(&queue_lock);
 					put_process(tmp);
+					sem_wait(&queue_lock);
 
 					tmp = dummy->next->next;
 					free(dummy->next);
 					dummy->next = tmp;
 				}
-				pthread_mutex_unlock(&queue_lock);
 			}
 			/* dorme por 1 quantum */
 			nanosleep(&nsleep_time, NULL);
@@ -157,7 +154,7 @@ void* queue_manager() {
 			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
 				/*trava a fila para podermos mexer nela */
-				pthread_mutex_lock(&queue_lock);
+				while(pthread_mutex_trylock(&queue_lock) != 0);
 
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
@@ -193,9 +190,6 @@ void* queue_manager() {
 			dummy = head;
 			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
-				/*trava a fila para podermos mexer nela */
-				pthread_mutex_lock(&queue_lock);
-
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
 				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
@@ -206,13 +200,13 @@ void* queue_manager() {
 					   Com prioridade: prioridade = (dt + t0) / deadline
 					*/
 					tmp->priority = (tmp->dt + tmp->t0) / tmp->deadline;
+					tmp->start_time = sim_time;
 					put_process(tmp);
 
 					tmp = dummy->next->next;
 					free(dummy->next);
 					dummy->next = tmp;
 				}
-				pthread_mutex_unlock(&queue_lock);
 			}
 			/* dorme por 1 quantum */
 			nanosleep(&nsleep_time, NULL);
@@ -220,40 +214,31 @@ void* queue_manager() {
 	}
 
 	printf("Fim do queue_manager! :)\n");
-	return;
+	pthread_exit(NULL);
 }
 
-/* Função
+/* Função pra simular o escalonador de cada CPU
 */
 void* cpu_scheduler(void* n_cpu) {
 	struct timespec nsleep_time;
-	pthread_t process_thread;
+	pthread_t *process_thread = mallocc(sizeof(pthread_t));
 	Process *process;
-	pthread_mutex_t *cpu_lock;
+	sem_t *cpu_lock;
 	int cpu_id = *(int *) n_cpu;
 	double simulated_time;
 
-	/* recebe a trava da cpu certa */
-	if (cpu_id == 0) {
-		cpu_lock = &cpu0;
-	}
-	else if (cpu_id == 1) {
-		cpu_lock = &cpu1;
-	}
-	else if (cpu_id == 2) {
-		cpu_lock = &cpu2;
-	}
-	else if (cpu_id == 3) {
-		cpu_lock = &cpu3;
-	}
+	/* pega a trava correspondente ao numero da cpu */
+	cpu_lock = &cpu_locks[cpu_id];
+
+	printf("Trava do scheduler (CPU %d) recebida!\n", cpu_id);
 
 	/* enquanto tiver processos na fila, escalona eles pra essa cpu */
 	while (process_table->next != NULL) {
 
-		pthread_mutex_lock(&queue_lock);
 		/* pega o processo e reorganizar a fila */
-		process = get_process(); 
-		pthread_mutex_unlock(&queue_lock);
+		sem_wait(&queue_lock);
+		process = get_process();
+		sem_post(&queue_lock);
 
 		if (process == NULL) {
 			continue;
@@ -264,51 +249,51 @@ void* cpu_scheduler(void* n_cpu) {
 
 		/* cria thread pra simular a execução do processo na CPU 
 		   e dorme em seguida */
-		pthread_create(&process_thread, NULL, processing, (void *) process);
 		nsleep_time = (struct timespec) {QUANTUM_SEC, (long) process->priority * QUANTUM_NSEC};
+		pthread_create(process_thread, NULL, processing, (void *) process);
 		nanosleep(&nsleep_time, NULL);
 
 		/* simulação da preempção, usando mutex para travar a thread da cpu
 		   e cancelando sua execução */
-		pthread_mutex_lock(cpu_lock);
-		pthread_cancel(process_thread);
-		simulated_time = (double) (clock() - start_time) / CLOCKS_PER_SEC;
+		pthread_cancel(*process_thread);
+		simulated_time = (double) (clock() - process->start_time) / CLOCKS_PER_SEC;
 		/* se o processo fez o que deveria, termina ele */
 		if (simulated_time >= process->dt) {
 			process->tf = simulated_time;
 			printf("Processo %s terminou sua execução no tempo %.1f.\n", process->name, process->tf);
 		}
 		else {
-			pthread_mutex_lock(&queue_lock);
+			sem_wait(&queue_lock);
 			put_process(process);
-			pthread_mutex_unlock(&queue_lock);
-			printf("Troca de contexto pra acontecer!\n");
-		}
-		pthread_mutex_unlock(cpu_lock);
-	}
+			sem_post(&queue_lock);
 
-	free(n_cpu);
-	return;
+			printf("Troca de contexto pra acontecer com o processo de t0 = %f\n", process->t0);
+		}
+	}
+	pthread_exit(NULL);
 }
+
 /* Função para simular o processo na CPU 
 */
 void* processing(void* process) {
+	struct timespec nsleep_time;
 	Process *p = (Process *) process;
 	int i;
 
 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 	printf("Entrou no processamento o processo de t0 = %.1f\n", p->t0);
+	nsleep_time = (struct timespec) {QUANTUM_SEC, (long) p->priority * QUANTUM_NSEC};
 
 	while(1) {
-		pthread_mutex_lock(p->cpu_lock);
-		for (i = 0; i < 42; i++);
-		pthread_mutex_unlock(p->cpu_lock);
+		for(i = 0; i < 100; i++);
 	}
 
-	return;
+	pthread_exit(NULL);
 }
 
+/* pega processo na fila de processos. 
+   Usa a trava para impedir que outras threads mexam 
+   na fila enquanto essa função é executada */
 Process *get_process() {
 	Process *result;
 
@@ -322,6 +307,9 @@ Process *get_process() {
 	}
 }
 
+/* Coloca processos na fila de processos. 
+   Usa a trava para impedir que outras threads mexam 
+   na fila enquanto essa função é executada */
 void put_process(Process *p) {
 	Process *dummy, *tmp;
 
@@ -330,6 +318,7 @@ void put_process(Process *p) {
 	if (schel_policy == SHORTEST_JOB_FIRST) {
 		dummy = process_table;
 		while (dummy->next != NULL) {
+			printf("put process rodando no loop.\n");
 			if (p->dt < dummy->next->dt) {
 				tmp = dummy->next;
 				dummy->next = p;
@@ -344,6 +333,8 @@ void put_process(Process *p) {
 	else {
 		dummy = process_table;
 		while (dummy->next != NULL) {
+			printf("put process rodando no loop.\n");
+
 			dummy = dummy->next;
 		}
 		dummy->next = p;

@@ -2,13 +2,14 @@
 #define PROCESS_HEADER
 
 #include <pthread.h>
+#include <semaphore.h>
 
 /* Um processo, além dos requisitos do EP, tem um campo
    para falar em qual sua thread de execução, um campo next para lista ligada */
 struct process {
 	char* name;
 	double t0, dt, deadline, tf, start_time, priority;
-	pthread_mutex_t *cpu_lock;
+	sem_t *cpu_lock;
 	pthread_t *exec_thread;
 	struct process *next;
 };
