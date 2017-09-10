@@ -8,9 +8,9 @@
 
 Process *process_table, *last_process = NULL;
 Process *head;
-int n_proc = 0, remaining_process = 0, schel_policy = ROUND_ROBIN;
+int n_proc = 0, schel_policy = ROUND_ROBIN;
 clock_t start_time;
-pthread_mutex_t queue_lock, cpu0, cpu1, cpu2, cpu3, process_count;
+pthread_mutex_t queue_lock, cpu0, cpu1, cpu2, cpu3;
 
 void scheduler_simulator(int scheduler_option, char *trace) {
 	int i;
@@ -19,7 +19,7 @@ void scheduler_simulator(int scheduler_option, char *trace) {
 	FILE *trace_in;
 	Process *tmp, *p;
 
-	n_proc = remaining_process = count_processes (trace);
+	n_proc = count_processes (trace);
 	process_table = mallocc(sizeof (Process));
 	process_table->next = NULL;
 
@@ -67,36 +67,29 @@ void shortest_job_first (int nproc){
 void round_robin (int nproc) {
 	pthread_t q_manager, cpus[N_CPUS];
 	pthread_mutex_t *cpu_lock;
-	int i;
-
-	printf("Cheguei até aqui, pelo menos! Na round_robin()\n");
+	int i, arg_i[N_CPUS];
 
 	/* prepara as coisas do queue_manager e lança ele */
 
 	pthread_mutex_init(&queue_lock, NULL);
-	printf("Lançando queue_manager...\n");
 	pthread_create(&q_manager, NULL, queue_manager, NULL);
 
-	printf("Inicializando mutexes.\n");
-
-	pthread_mutex_init(&process_count, NULL);
 	pthread_mutex_init(&cpu0, NULL);
 	pthread_mutex_init(&cpu1, NULL);
 	pthread_mutex_init(&cpu2, NULL);
 	pthread_mutex_init(&cpu3, NULL);
 
 	sleep(3);
-	printf("Distribuindo threads das CPUs.\n");
 	for (i = 0; i < N_CPUS; i++) {
-		printf("Lançando cpu_scheduler numero %d...\n", i);
-		pthread_create(&(cpus[i]), NULL, cpu_scheduler, (void *) i);
+		arg_i[i] = i;
+		pthread_create(&(cpus[i]), NULL, cpu_scheduler, (void *) &arg_i[i]);
 	}
 
-	/* a simulação acaba quando o queue_manager voltar */
-	/*pthread_join(cpus[0], NULL);
+	/* a simulação acaba quando o escalonamento das CPUs acabar */
+	pthread_join(cpus[0], NULL);
 	pthread_join(cpus[1], NULL);
 	pthread_join(cpus[2], NULL);
-	pthread_join(cpus[3], NULL);*/
+	pthread_join(cpus[3], NULL);
 
 	return;
 }
@@ -119,12 +112,10 @@ void* queue_manager() {
 
 		/* enquanto tiver novos processos para entrar na tabela */
 		while(head->next != NULL) {
-			printf("Q MANAGER: iniciando verificacao de processos pendentes.\n");
 
 			/* verifica se tem novos processos tentando entrar na fila
 				de processos */
 			sim_time = (double) (clock() - start_time) * 1000. / CLOCKS_PER_SEC;
-			printf("Tempo de simulação atual: %f.\n", sim_time);
 			dummy = head;
 			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
@@ -134,7 +125,6 @@ void* queue_manager() {
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
 				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
-					printf("Processo novo na tabela!\n");
 					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
 					/* prioridade do processo é definido pelo tido de escalonador */
 					/* Round-robin: prioridade 3 para todos
@@ -143,7 +133,6 @@ void* queue_manager() {
 					*/
 					tmp->priority = 3.0;
 					put_process(tmp);
-					printf("processo adicionado de t0 %.1f.\n", tmp->t0);
 
 					tmp = dummy->next->next;
 					free(dummy->next);
@@ -160,12 +149,10 @@ void* queue_manager() {
 
 		/* enquanto tiver novos processos para entrar na tabela */
 		while(head->next != NULL) {
-			printf("Q MANAGER: iniciando verificacao de processos pendentes.\n");
 
 			/* verifica se tem novos processos tentando entrar na fila
 				de processos */
 			sim_time = (double) (clock() - start_time) * 1000. / CLOCKS_PER_SEC;
-			printf("Tempo de simulação atual: %f.\n", sim_time);
 			dummy = head;
 			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
@@ -175,7 +162,6 @@ void* queue_manager() {
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
 				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
-					printf("Processo novo na tabela!\n");
 					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
 					/* prioridade do processo é definido pelo tido de escalonador */
 					/* Round-robin: prioridade 3 para todos
@@ -184,7 +170,6 @@ void* queue_manager() {
 					*/
 					tmp->priority = tmp->dt * 10.;
 					put_process(tmp);
-					printf("processo adicionado de t0 %.1f.\n", tmp->t0);
 
 					tmp = dummy->next->next;
 					free(dummy->next);
@@ -201,12 +186,10 @@ void* queue_manager() {
 
 		/* enquanto tiver novos processos para entrar na tabela */
 		while(head->next != NULL) {
-			printf("Q MANAGER: iniciando verificacao de processos pendentes.\n");
 
 			/* verifica se tem novos processos tentando entrar na fila
 				de processos */
 			sim_time = (double) (clock() - start_time) * 1000. / CLOCKS_PER_SEC;
-			printf("Tempo de simulação atual: %f.\n", sim_time);
 			dummy = head;
 			if (dummy->next != NULL && sim_time >= dummy->next->t0) {
 
@@ -216,7 +199,6 @@ void* queue_manager() {
 				/*adiciona todos os processos na tabela de processos se
 				  ja tiver passado o tempo t0 desses processos*/
 				while (dummy->next != NULL && sim_time >= dummy->next->t0) {
-					printf("Processo novo na tabela!\n");
 					tmp = new_process(dummy->next->t0, dummy->next->dt, dummy->next->deadline, dummy->next->name);
 					/* prioridade do processo é definido pelo tido de escalonador */
 					/* Round-robin: prioridade 3 para todos
@@ -225,7 +207,6 @@ void* queue_manager() {
 					*/
 					tmp->priority = (tmp->dt + tmp->t0) / tmp->deadline;
 					put_process(tmp);
-					printf("processo adicionado de t0 %.1f.\n", tmp->t0);
 
 					tmp = dummy->next->next;
 					free(dummy->next);
@@ -252,8 +233,6 @@ void* cpu_scheduler(void* n_cpu) {
 	int cpu_id = *(int *) n_cpu;
 	double simulated_time;
 
-	printf("Entrou no cpu scheduler!\n");
-
 	/* recebe a trava da cpu certa */
 	if (cpu_id == 0) {
 		cpu_lock = &cpu0;
@@ -264,15 +243,12 @@ void* cpu_scheduler(void* n_cpu) {
 	else if (cpu_id == 2) {
 		cpu_lock = &cpu2;
 	}
-	else {
+	else if (cpu_id == 3) {
 		cpu_lock = &cpu3;
 	}
 
-	printf("CPU SCHEDULER: trava setada!\n");
-
 	/* enquanto tiver processos na fila, escalona eles pra essa cpu */
-	while (remaining_process > 0) {
-		pthread_mutex_unlock(&process_count);
+	while (process_table->next != NULL) {
 
 		pthread_mutex_lock(&queue_lock);
 		/* pega o processo e reorganizar a fila */
@@ -280,15 +256,15 @@ void* cpu_scheduler(void* n_cpu) {
 		pthread_mutex_unlock(&queue_lock);
 
 		if (process == NULL) {
-			pthread_mutex_lock(&process_count);
 			continue;
 		}
+		process->cpu_lock = cpu_lock;
 
-		/* libera a trava da cpu para o processo poder executar */
-		pthread_mutex_unlock(cpu_lock);
+		printf("Entrou no escalonador o processo de t0 = %.1f na CPU %d.\n", process->t0, cpu_id);
+
 		/* cria thread pra simular a execução do processo na CPU 
 		   e dorme em seguida */
-		pthread_create(&process_thread, NULL, processing, process);
+		pthread_create(&process_thread, NULL, processing, (void *) process);
 		nsleep_time = (struct timespec) {QUANTUM_SEC, (long) process->priority * QUANTUM_NSEC};
 		nanosleep(&nsleep_time, NULL);
 
@@ -301,28 +277,32 @@ void* cpu_scheduler(void* n_cpu) {
 		if (simulated_time >= process->dt) {
 			process->tf = simulated_time;
 			printf("Processo %s terminou sua execução no tempo %.1f.\n", process->name, process->tf);
-
-			pthread_mutex_lock(&process_count);
-			remaining_process--;
-			pthread_mutex_unlock(&process_count);
 		}
 		else {
+			pthread_mutex_lock(&queue_lock);
 			put_process(process);
+			pthread_mutex_unlock(&queue_lock);
 			printf("Troca de contexto pra acontecer!\n");
 		}
-		pthread_mutex_lock(&process_count);
+		pthread_mutex_unlock(cpu_lock);
 	}
+
+	free(n_cpu);
 	return;
 }
 /* Função para simular o processo na CPU 
 */
 void* processing(void* process) {
 	Process *p = (Process *) process;
-	double simulated_time;
+	int i;
+
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+	printf("Entrou no processamento o processo de t0 = %.1f\n", p->t0);
 
 	while(1) {
 		pthread_mutex_lock(p->cpu_lock);
-		simulated_time = (double) (clock() - start_time) / CLOCKS_PER_SEC;
+		for (i = 0; i < 42; i++);
 		pthread_mutex_unlock(p->cpu_lock);
 	}
 
