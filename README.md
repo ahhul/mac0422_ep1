@@ -1,13 +1,15 @@
-# mac0422_ep1
+# MAC0422 - Sistemas Operacionais - EP1
 
+- João Henrique Luciano (NUSP: 8535957)
 
-Ideia do escalonador
---------------------
+- Ludmila Ferreira      (NUSP: 7557136)
 
-A ideia que tive foi a seguinte: se tivermos '''n''' núcleos na máquina
+Compilando o código
+-------------------
 
-1 - o programa cria '''n+1''' threads (1 para receber novos processos, 1 para cada núcleo)
+Para compilar o código do EP1, basta, na pasta principal, rodar
 
-2 - as threads de cada núcleo vão ser responsaveis por escalonar os processos da tabela de processos nesses nucleos
-
-3 - a thread restante vai ser responsável por adicionar novos processos na tabela de processos
+```sh
+make ep1sh
+make ep1
+```
