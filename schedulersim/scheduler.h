@@ -19,10 +19,12 @@
 
 void* processing(void* process);
 void* queue_manager();
-void* cpu_scheduler(void*);
+void* cpu_scheduler(void* n_cpu);
 void scheduler_simulator(int scheduler_option, char *trace);
 void shortest_job_first ();
 void round_robin ();
 void priority_scheduling ();
+Process *get_process();
+void put_process(Process *p);
 
 #endif

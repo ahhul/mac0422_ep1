@@ -7,7 +7,7 @@
    para falar em qual sua thread de execução, um campo next para lista ligada */
 struct process {
 	char* name;
-	double t0, dt, deadline, tf, priority;
+	double t0, dt, deadline, tf, start_time, priority;
 	pthread_mutex_t *cpu_lock;
 	pthread_t *exec_thread;
 	struct process *next;
