@@ -2,7 +2,7 @@
 
 - João Henrique Luciano (NUSP: 8535957)
 
-- Ludmila Ferreira      (NUSP: 7557136)
+- Ludmila Ferreira Vicente e Silva (NUSP: 7557136)
 
 Compilando o código
 -------------------
