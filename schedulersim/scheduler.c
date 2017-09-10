@@ -14,7 +14,8 @@ Process *process_table, *last_process = NULL;
 Process *head;
 int n_proc = 0, schel_policy = ROUND_ROBIN;
 clock_t start_time;
-sem_t queue_lock, cpu_locks[N_CPUS];
+pthread_mutex_t queue_lock, cpu_locks[N_CPUS];
+pthread_cond_t cpu_conds[N_CPUS];
 
 void scheduler_simulator(int scheduler_option, char *trace) {
 	int i;
@@ -74,13 +75,14 @@ void round_robin (int nproc) {
 
 	/* prepara as coisas do queue_manager e lança ele */
 
-	sem_init(&queue_lock, 0, 1);
+	pthread_mutex_init(&queue_lock, NULL);
 	pthread_create(&q_manager, NULL, queue_manager, NULL);
 
 
 	sleep(3);
 	for (i = 0; i < N_CPUS; i++) {
-		sem_init(&cpu_locks[i], 0, 1);
+		pthread_cond_init(&cpu_conds[i], NULL);
+		pthread_mutex_init(&cpu_locks[i], NULL);
 		cpu_ids[i] = i;
 		pthread_create(&(cpus[i]), NULL, cpu_scheduler, (void *) &cpu_ids[i]);
 	}
@@ -221,14 +223,15 @@ void* queue_manager() {
 */
 void* cpu_scheduler(void* n_cpu) {
 	struct timespec nsleep_time;
-	pthread_t *process_thread = mallocc(sizeof(pthread_t));
 	Process *process;
-	sem_t *cpu_lock;
+	pthread_mutex_t *cpu_lock;
 	int cpu_id = *(int *) n_cpu;
 	double simulated_time;
+	pthread_cond_t *cpu_cond;
 
 	/* pega a trava correspondente ao numero da cpu */
 	cpu_lock = &cpu_locks[cpu_id];
+	cpu_cond = &cpu_conds[cpu_id];
 
 	printf("Trava do scheduler (CPU %d) recebida!\n", cpu_id);
 
@@ -240,22 +243,27 @@ void* cpu_scheduler(void* n_cpu) {
 		process = get_process();
 		sem_post(&queue_lock);
 
-		if (process == NULL) {
-			continue;
+		if (process->exec_thread == NULL) {
+			process->exec_thread = mallocc(sizeof(pthread_t));
 		}
+
 		process->cpu_lock = cpu_lock;
+		process->cpu_cond = cpu_cond;
 
 		printf("Entrou no escalonador o processo de t0 = %.1f na CPU %d.\n", process->t0, cpu_id);
 
 		/* cria thread pra simular a execução do processo na CPU 
 		   e dorme em seguida */
-		nsleep_time = (struct timespec) {QUANTUM_SEC, (long) process->priority * QUANTUM_NSEC};
-		pthread_create(process_thread, NULL, processing, (void *) process);
-		nanosleep(&nsleep_time, NULL);
+		/*nsleep_time = (struct timespec) {QUANTUM_SEC, (long) process->priority * QUANTUM_NSEC};*/
+
+		pthread_mutex_lock(process->cpu_lock);
+		pthread_cond_wait(cpu_cond, process->cpu_lock);
+		pthread_create(process->exec_thread, NULL, processing, (void *) process);
+		pthread_mutex_unlock(process->cpu_lock);
+
 
 		/* simulação da preempção, usando mutex para travar a thread da cpu
 		   e cancelando sua execução */
-		pthread_cancel(*process_thread);
 		simulated_time = (double) (clock() - process->start_time) / CLOCKS_PER_SEC;
 		/* se o processo fez o que deveria, termina ele */
 		if (simulated_time >= process->dt) {
@@ -278,17 +286,11 @@ void* cpu_scheduler(void* n_cpu) {
 void* processing(void* process) {
 	struct timespec nsleep_time;
 	Process *p = (Process *) process;
-	int i;
 
-	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
 	printf("Entrou no processamento o processo de t0 = %.1f\n", p->t0);
 	nsleep_time = (struct timespec) {QUANTUM_SEC, (long) p->priority * QUANTUM_NSEC};
-
-	while(1) {
-		for(i = 0; i < 100; i++);
-	}
-
-	pthread_exit(NULL);
+	nanosleep(&nsleep_time, NULL);
+	pthread_cond_signal(p->cpu_cond);
 }
 
 /* pega processo na fila de processos. 

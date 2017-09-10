@@ -9,7 +9,8 @@
 struct process {
 	char* name;
 	double t0, dt, deadline, tf, start_time, priority;
-	sem_t *cpu_lock;
+	pthread_mutex_t *cpu_lock;
+	pthread_cond_t *cpu_cond;
 	pthread_t *exec_thread;
 	struct process *next;
 };
